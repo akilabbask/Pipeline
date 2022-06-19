@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Resources:
+  CodePipelineServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties: 
+      Description: 'This role will enable Pipeline Creation'
+      RoleName: 'FullCodePipelineExecPerm'
+      #MaxSessionDuration: "7200"
+      ManagedPolicyArns:
+        - Ref: 'CodePipelinePolicy'
+      AssumeRolePolicyDocument: 
+        Version: '2012-10-17'
+        Statement:
+        - Effect: 'Allow'
+          Principal:
+            Service: 'codepipeline.amazonaws.com'
+          Action: 'sts:AssumeRole'
+    DependsOn: 'CodePipelinePolicy'
+ 
+  CodePipelinePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      ManagedPolicyName: "CodePipelinePol"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:*'
+              - 'cloudformation:*'
+              - 'codestar-connections:*'
+            Resource: '*'  
+
+  PipelineSrcStgArefacts:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: 'jidikujumumu'
+
+  CreatePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      Name: 'TFE_Deploy' 
+      ArtifactStore: 
+        Type: 'S3'
+        Location: 
+          Ref: 'PipelineSrcStgArefacts'
+      RoleArn: !GetAtt 'CodePipelineServiceRole.Arn'
+      Stages: 
+          -  
+             Name: 'Source'
+             Actions: 
+               -  Name: PipelineSource 
+                  RunOrder: 1
+                  OutputArtifacts:
+                    -  Name: 'SourceArtefacts'
+                  ActionTypeId: 
+                    Category: Source
+                    Owner: AWS
+                    Provider: CodeStarSourceConnection
+                    Version: '1'
+                  Configuration: 
+                    FullRepositoryId: 'akilabbask/Pipeline'
+                    #PollForSourceChanges: 'false'
+                    BranchName: 'main'
+                    ConnectionArn: 'arn:aws:codestar-connections:us-east-1:190509650192:connection/2964d560-9a45-46be-859c-82b3ee268611'
+                    DetectChanges: 'true'
+                    OutputArtifactFormat: 'CODE_ZIP'
+               
+          -
+             Name: 'Deploy' 
+             Actions: 
+               - 
+                 Name: 'PipelineDeploy' 
+                 ActionTypeId: 
+                   Category: Deploy
+                   Owner: AWS
+                   Version: 1
+                   Provider: S3
+                 Configuration: 
+                   BucketName: deplthrus3
+                   Extract: 'false'
+                   ObjectKey: vpc.yaml
+                 InputArtifacts:
+                   - Name: 'SourceArtefacts'
+                 #OutputArtifacts: []
+                 RunOrder: 1 
+  
